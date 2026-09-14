@@ -1,0 +1,15 @@
+logs
+.venv
+__pycache__
+keys
+components.db
+.codex
+dist
+build
+*.spec
+config/appconfig.local.yaml
+backup_logs
+CLAUDE.md
+.run.lock
+.monitor.lock
+config/config.ini.bak

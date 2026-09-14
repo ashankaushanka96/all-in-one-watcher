@@ -1,0 +1,27 @@
+- name: "all-in-one-watcher-ansible-playbook"
+  hosts: all
+  remote_user: deploy_user
+  connection: ssh
+  become: true
+  become_user: app_user
+
+  vars:
+    environment_name: "{{ lookup('env', 'CI_ENVIRONMENT_NAME') }}"
+    _date: "{{ansible_date_time.iso8601}}"
+    watcher_main_file_name: "{{ lookup('env', 'WATCHER_MAIN_FILE_NAME') | default('all_in_one_watcher.py') }}"
+    region_name: "{{ lookup('env', 'AWS_DEFAULT_REGION') , default='us-east-1' }}"
+    cron_update: "{{ lookup('env', 'CRON_UPDATE') | default('false') }}"
+
+  pre_tasks:
+    - name: Choose watcher_path for prod-dc
+      set_fact:
+        watcher_path: "/home/app_user/app/all_in_one_watcher"
+      when: environment_name == 'prod-dc'
+
+    - name: Choose watcher_path for other environments
+      set_fact:
+        watcher_path: "/apps/all_in_one_watcher"
+      when: environment_name != 'prod-dc'
+
+  roles:
+    - role: deploy-watcher

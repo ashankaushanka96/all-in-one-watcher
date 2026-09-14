@@ -1,0 +1,52 @@
+# appconfig.yaml
+meta_data:
+  product: "example-product"
+  service: "all-in-one-watcher"
+  region: "eu-west-1"
+
+mail_configs:
+  from_address: "watcher@example.com"
+  to_addresses:
+    # - "team.alerts@example.com"
+    - "alerts@example.com"
+  mail_send: true
+  mail_credentials:
+    secret:
+      name: "ses-credentials"
+    env:
+      path: "~/.env"
+
+datadog_metrics:
+  enabled: true
+
+watcher_settings:
+  watch_interval: 20 # in seconds
+  component_collection_interval: 10800 # 3 hours in seconds
+  monitor_interval: 60 # in seconds
+  start_check_interval: 2 # in seconds; wait after starting a component before verifying it came up. Override per component with startCheckInterval in config.ini.
+
+aggregator_backend:
+  enabled: true
+  base_url: "http://<AGGREGATOR_HOST>:8000"
+  component_db_ingest_path: "/api/v1/components/add-modify"
+  component_ingest_path: "/api/v1/component/ingest-component"
+  server_details_ingest_path: "/api/v1/server/ingest-server-details"
+
+watcher_api:
+  enabled: true
+  host: "0.0.0.0"
+  port: 25628
+  api_key_credentials:
+    secret:
+      name: "watcher-api-credentials"
+    env:
+      path: "~/.env"
+
+component_classification:
+  tool_names:
+    - "rtconsole"
+    - "monitoringtool"
+  tool_prefixes:
+    - "log_monitoring_app"
+    - "log_monitor_app"
+  tool_suffixes: []

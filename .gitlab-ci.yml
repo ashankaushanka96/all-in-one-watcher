@@ -1,0 +1,243 @@
+include:
+  - project: "your-org/lib/ci-templates"
+    ref: common
+    file:
+      - Jobs/ansible-deployment.gitlab-ci.yml
+
+variables:
+  VERSION: 1.0.${CI_PIPELINE_IID}
+  PRODUCT: example-product
+  SERVICE: all-in-one-watcher
+  WATCHER_MAIN_FILE_NAME: all_in_one_watcher.py
+  ANSIBLE_KEY_FILE: $DEPLOY_USER_KEY
+  CRON_UPDATE:
+    description: "Update crontab with all-in-one-watcher tasks"
+    value: "false"
+    options:
+      - "true"
+      - "false"
+
+stages:
+  - build
+  - pre-deploy
+  - deploy_uat
+  - deploy_prod_us
+  - deploy_prod_asia
+  - deploy_prod_ir
+  - deploy_prod_dc
+
+workflow:
+  rules:
+    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_BRANCH == "latest"'
+    - when: never
+
+.git_access:
+  before_script:
+    - git config --global credential.helper store
+    - echo "https://gitlab-ci-token:${ANSIBLE_ROLES_REGISTRY_KEY}@gitlab.com" >>  ~/.git-credentials
+    - chmod 600 ~/.git-credentials
+
+build:
+  stage: build
+  image: alpine:latest
+  tags:
+    - example
+    - uat
+  script:
+    - mkdir watcher_stuff
+    - echo "${SERVICE}-${VERSION}" > version.txt
+    - cp -rf ${WATCHER_MAIN_FILE_NAME} app config deploy *.sh version.txt README.md requirements.txt watcher_stuff/
+    - tar -czf watcher_stuff.tar.gz watcher_stuff/
+  artifacts:
+    paths:
+      - watcher_stuff.tar.gz
+
+.prepare_hosts_file:
+  stage: pre-deploy
+  image: alpine:latest
+  environment: uat
+  script:
+    - |
+      if [ -n "$HOST_IPS_FILE" ]; then
+        cp "$HOST_IPS_FILE" "${CI_PROJECT_DIR}/ansible/hosts.txt"
+      else
+        echo "ERROR: HOST_IPS_FILE not set" >&2; exit 1
+      fi
+  artifacts:
+    paths:
+      - ${CI_PROJECT_DIR}/ansible/hosts.txt
+
+.deploy_all:
+  image: $DOCKER_REGISTRY/ansible:latest
+  extends:
+    - .git_access
+  script:
+    - cd $ANSIBLE_DIR
+    - ansible-playbook ${CI_PROJECT_DIR}/ansible/$SERVICE-ansible-playbook.yml --extra-vars "ansible_private_key_file=$ANSIBLE_KEY_FILE region_name=$AWS_DEFAULT_REGION ansible_ssh_common_args='-o StrictHostKeyChecking=no'" -i ${CI_PROJECT_DIR}/ansible/hosts.txt
+  when: manual
+
+.deploy_single_host:
+  image: $DOCKER_REGISTRY/ansible:latest
+  extends:
+    - .git_access
+  script:
+    - cd $ANSIBLE_DIR
+    - ansible-playbook ${CI_PROJECT_DIR}/ansible/$SERVICE-ansible-playbook.yml --extra-vars "ansible_private_key_file=$ANSIBLE_KEY_FILE region_name=$AWS_DEFAULT_REGION ansible_ssh_common_args='-o StrictHostKeyChecking=no'" -i "${HOST_IP},"
+  when: manual
+
+######################### PRE DEPLOYMENT #########################
+prepare_hosts_file_uat:
+  extends: .prepare_hosts_file
+  environment: uat
+
+prepare_hosts_file_prod_us:
+  extends: .prepare_hosts_file
+  environment: prod-us
+
+prepare_hosts_file_prod_asia:
+  extends: .prepare_hosts_file
+  environment: prod-asia
+
+prepare_hosts_file_prod_ir:
+  extends: .prepare_hosts_file
+  environment: prod-ir
+
+prepare_hosts_file_prod_dc:
+  extends: .prepare_hosts_file
+  environment: prod-dc
+
+######################### UAT DEPLOYMENT #########################
+deploy_uat_all:
+  tags:
+    - example
+    - uat
+  environment: uat
+  stage: deploy_uat
+  needs:
+    - build
+    - prepare_hosts_file_uat
+  dependencies:
+    - build
+    - prepare_hosts_file_uat
+  extends: .deploy_all
+
+deploy_uat_single_host:
+  tags:
+    - example
+    - uat
+  environment: uat
+  stage: deploy_uat
+  needs:
+    - build
+  dependencies:
+    - build
+  extends: .deploy_single_host
+
+######################### PROD US DEPLOYMENTS #########################
+deploy_prod_us_all:
+  tags:
+    - example
+    - prod
+  environment: prod-us
+  stage: deploy_prod_us
+  needs:
+    - build
+    - prepare_hosts_file_prod_us
+  dependencies:
+    - build
+    - prepare_hosts_file_prod_us
+  extends: .deploy_all
+
+deploy_prod_us_single_host:
+  tags:
+    - example
+    - prod
+  environment: prod-us
+  stage: deploy_prod_us
+  needs:
+    - build
+  dependencies:
+    - build
+  extends: .deploy_single_host
+
+######################### PROD ASIA DEPLOYMENTS #########################
+deploy_prod_asia_all:
+  tags:
+    - example
+    - prod-asia
+  environment: prod-asia
+  stage: deploy_prod_asia
+  needs:
+    - build
+    - prepare_hosts_file_prod_asia
+  dependencies:
+    - build
+    - prepare_hosts_file_prod_asia
+  extends: .deploy_all
+
+deploy_prod_asia_single_host:
+  tags:
+    - example
+    - prod-asia
+  environment: prod-asia
+  stage: deploy_prod_asia
+  needs:
+    - build
+  dependencies:
+    - build
+  extends: .deploy_single_host
+
+######################### PROD IR DEPLOYMENTS #########################
+deploy_prod_ir_all:
+  tags:
+    - example
+    - prod
+  environment: prod-ir
+  stage: deploy_prod_ir
+  needs:
+    - build
+    - prepare_hosts_file_prod_ir
+  dependencies:
+    - build
+    - prepare_hosts_file_prod_ir
+  extends: .deploy_all
+
+deploy_prod_ir_single_host:
+  tags:
+    - example
+    - prod
+  environment: prod-ir
+  stage: deploy_prod_ir
+  needs:
+    - build
+  dependencies:
+    - build
+  extends: .deploy_single_host
+
+######################### PROD DC DEPLOYMENTS #########################
+deploy_prod_dc_all:
+  tags:
+    - example
+    - prod-dc
+  environment: prod-dc
+  stage: deploy_prod_dc
+  needs:
+    - build
+    - prepare_hosts_file_prod_dc
+  dependencies:
+    - build
+    - prepare_hosts_file_prod_dc
+  extends: .deploy_all
+
+deploy_prod_dc_single_host:
+  tags:
+    - example
+    - prod-dc
+  environment: prod-dc
+  stage: deploy_prod_dc
+  needs:
+    - build
+  dependencies:
+    - build
+  extends: .deploy_single_host

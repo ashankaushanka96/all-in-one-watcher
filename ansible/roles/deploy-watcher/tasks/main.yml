@@ -1,0 +1,44 @@
+---
+- name: Check whether watcher_path already exists (i.e. this is an update, not a fresh install)
+  ansible.builtin.stat:
+    path: "{{ watcher_path }}"
+  register: watcher_path_stat
+
+- name: Ensure watcher_path exists
+  ansible.builtin.file:
+    path: "{{ watcher_path }}"
+    state: directory
+    mode: '0755'
+
+- name: Copy watcher release archive to watcher_path
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../watcher_stuff.tar.gz"
+    dest: "{{ watcher_path }}/watcher_stuff.tar.gz"
+
+- name: Extract watcher release archive
+  ansible.builtin.unarchive:
+    src: "{{ watcher_path }}/watcher_stuff.tar.gz"
+    dest: "{{ watcher_path }}/"
+    remote_src: true
+
+- name: Remove the archive now that it's extracted
+  ansible.builtin.file:
+    path: "{{ watcher_path }}/watcher_stuff.tar.gz"
+    state: absent
+
+- name: Run deploy/install.sh (backup, install, merge configs, rebuild venv, permissions, crontab, restart)
+  ansible.builtin.command:
+    argv:
+      - "{{ watcher_path }}/watcher_stuff/deploy/install.sh"
+      - "{{ watcher_path }}"
+      - "{{ watcher_main_file_name }}"
+      - "{{ environment_name }}"
+      - "{{ region_name }}"
+      - "{{ cron_update }}"
+      - "{{ watcher_path_stat.stat.exists | string | lower }}"
+  register: install_result
+  changed_when: true
+
+- name: Show install.sh result
+  ansible.builtin.debug:
+    msg: "{{ install_result.stdout_lines[-1] | default('install.sh produced no output') }}"

@@ -1,0 +1,11 @@
+loguru
+datadog
+psutil
+boto3
+python-dotenv
+pyyaml
+botocore
+requests
+pydantic
+fastapi
+uvicorn
